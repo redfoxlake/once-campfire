@@ -1,0 +1,208 @@
+/* ============================================================================
+   zz_imessage_bubbles.css — iMessage-style message bubbles for Campfire
+   CSS ONLY. No Ruby/JS/view changes.
+
+   ⚠️ FILENAME IS LOad-ORDER-CRITICAL. Propshaft's `stylesheet_link_tag :all`
+   emits one <link> per stylesheet in ALPHABETICAL order with no manifest.
+   This file MUST sort AFTER messages.css to win the cascade — hence `zz_`.
+   Do not rename to anything that sorts before "messages".
+
+   SOW: sent=accent-blue/right, received=gray/left, received-only avatars,
+   sender name BELOW each group, authentic tails (full fidelity), hover
+   timestamps, ~85% width kept, light-mode-first, edge cases preserved,
+   reactions follow bubble side.
+
+   Position backbone (.message--threaded = same author as prev sibling <5min):
+     Singleton: :not(.message--threaded):not(:has(+ .message--threaded))
+     First:     :not(.message--threaded):has(+ .message--threaded)
+     Middle:    .message--threaded:has(+ .message--threaded)
+     Last:      .message--threaded:not(:has(+ .message--threaded))
+   ============================================================================ */
+
+:root {
+  --imsg-radius: 1.15rem;          /* bubble corner radius */
+  --imsg-tail: 0.5rem;             /* tail size */
+  --imsg-sent-bg: oklch(var(--lch-blue));
+  --imsg-sent-fg: var(--color-text-reversed);
+  --imsg-name-gap: 1.25rem;        /* space reserved below a group for the name */
+}
+
+/* Shorthand the guard chain reads as:
+   .imsg = normal text bubble only (exempts emoji/mention/attachment/pending). */
+
+/* ===========================================================================
+   PHASE 1 — Bubble colors + shape
+   =========================================================================== */
+
+/* Rounder bubbles, both sides (normal text only) */
+.message:not(.message--emoji):not(.message--mentioned)
+  > * .message__body-content:not(:has(.message__attachment)):not(:has(.message__pending-upload)),
+.message:not(.message--emoji):not(.message--mentioned)
+  .message__body-content:not(:has(.message__attachment)):not(:has(.message__pending-upload)) {
+  border-radius: var(--imsg-radius);
+}
+
+/* SENT = own messages → accent blue, white text */
+.message--me:not(.message--emoji):not(.message--mentioned)
+  .message__body-content:not(:has(.message__attachment)):not(:has(.message__pending-upload)) {
+  --message-background: var(--imsg-sent-bg);
+  --message-color: var(--imsg-sent-fg);
+}
+
+/* Sent bubble: white links / inline code / timestamp / (defensive) name —
+   prevents blue-on-blue from --color-link */
+.message--me .message__body-content a,
+.message--me .message__body-content .trix-content a {
+  color: var(--imsg-sent-fg);
+  text-decoration: underline;
+}
+.message--me .message__body-content code {
+  color: var(--imsg-sent-fg);
+  background-color: oklch(var(--lch-white) / 0.18);
+}
+.message--me .message__permalink,
+.message--me .message__permalink .message__timestamp,
+.message--me .message__author strong {
+  color: var(--imsg-sent-fg);
+}
+
+/* ===========================================================================
+   PHASE 2 — Name + avatar BELOW each received group
+   (sent: no avatar/name at all; received: show on LAST of group, below bubble)
+   =========================================================================== */
+
+/* Sent: never show avatar or name */
+.message--me .message__avatar,
+.message--me .message__author { display: none; }
+
+/* Received FIRST/MIDDLE of a group (has a threaded follower): hide name + avatar */
+.message:not(.message--me):has(+ .message--threaded) .message__author,
+.message:not(.message--me):has(+ .message--threaded) .message__avatar { display: none; }
+
+/* Received last-of-group OR singleton (no threaded follower): name BELOW the bubble
+   + small avatar bottom-aligned. Complement selector covers both cases and overrides
+   the .message--threaded default-hide from messages.css. */
+.message:not(.message--me):not(:has(+ .message--threaded)) .message__author {
+  display: inline-flex;
+  position: absolute;
+  inset-block-start: 100%;
+  inset-inline-start: 0;
+  margin-block-start: 0.1rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  opacity: 0.5;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.message:not(.message--me):not(:has(+ .message--threaded)) .message__avatar {
+  display: block;
+  align-self: end;
+  --avatar-size: 2.2ch;
+}
+
+/* Reserve space below the last-of-group bubble so the dropped name doesn't
+   overlap the next group. */
+.message:not(.message--me):not(:has(+ .message--threaded)) .message__body-content {
+  margin-block-end: var(--imsg-name-gap);
+}
+
+/* ===========================================================================
+   PHASE 3 — Tails + corner-flattening matrix
+   Outer corners always round. Spine = received:left / sent:right.
+   =========================================================================== */
+
+/* ---- RECEIVED (spine = inline-start / left) ---- */
+.message:not(.message--me):not(.message--emoji):not(.message--mentioned)
+  .message__body-content:not(:has(.message__attachment)):not(:has(.message__pending-upload)) {
+  /* default singleton: fully round, handled by Phase 1 */
+}
+/* received FIRST: flatten bottom-left */
+.message:not(.message--me):not(.message--threaded):has(+ .message--threaded)
+  .message__body-content { border-end-start-radius: 0; }
+/* received MIDDLE: flatten both left corners */
+.message--threaded:not(.message--me):has(+ .message--threaded)
+  .message__body-content { border-start-start-radius: 0; border-end-start-radius: 0; }
+/* received LAST: flatten top-left (bottom-left keeps radius for tail base) */
+.message--threaded:not(.message--me):not(:has(+ .message--threaded))
+  .message__body-content { border-start-start-radius: 0; }
+
+/* ---- SENT (spine = inline-end / right) ---- */
+.message--me:not(.message--threaded):has(+ .message--threaded)
+  .message__body-content { border-end-end-radius: 0; }
+.message--me.message--threaded:has(+ .message--threaded)
+  .message__body-content { border-start-end-radius: 0; border-end-end-radius: 0; }
+.message--me.message--threaded:not(:has(+ .message--threaded))
+  .message__body-content { border-start-end-radius: 0; }
+
+/* ---- Tail: only SINGLETON + LAST get it.
+   ::before = colored bulge (behind bubble, z-index -2) — overlaps the bubble's
+   spine-bottom corner so there's NO gap, and overhangs outward.
+   ::after  = page-bg mask (z-index -1) — carves the concave underside into a curl. ---- */
+.message:not(.message--emoji):not(.message--mentioned):not(:has(+ .message--threaded))
+  .message__body-content:not(:has(.message__attachment)):not(:has(.message__pending-upload))::before,
+.message:not(.message--emoji):not(.message--mentioned):not(:has(+ .message--threaded))
+  .message__body-content:not(:has(.message__attachment)):not(:has(.message__pending-upload))::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  width: 0.95rem;
+  height: 0.95rem;
+}
+.message:not(.message--emoji):not(.message--mentioned):not(:has(+ .message--threaded))
+  .message__body-content:not(:has(.message__attachment)):not(:has(.message__pending-upload))::before {
+  background: var(--message-background, var(--color-message-bg));
+  z-index: -2;
+}
+.message:not(.message--emoji):not(.message--mentioned):not(:has(+ .message--threaded))
+  .message__body-content:not(:has(.message__attachment)):not(:has(.message__pending-upload))::after {
+  background: var(--color-bg);
+  z-index: -1;
+}
+
+/* received: tail bottom-LEFT (bulge hugs the bubble's bottom-left, curves down-left) */
+.message:not(.message--me):not(:has(+ .message--threaded)) .message__body-content::before {
+  left: -0.45rem;
+  border-bottom-right-radius: 0.95rem;
+}
+.message:not(.message--me):not(:has(+ .message--threaded)) .message__body-content::after {
+  left: -0.95rem;
+  border-bottom-right-radius: 0.95rem;
+}
+/* sent: tail bottom-RIGHT */
+.message--me:not(:has(+ .message--threaded)) .message__body-content::before {
+  right: -0.45rem;
+  border-bottom-left-radius: 0.95rem;
+}
+.message--me:not(:has(+ .message--threaded)) .message__body-content::after {
+  right: -0.95rem;
+  border-bottom-left-radius: 0.95rem;
+}
+
+/* ===========================================================================
+   PHASE 4 — Reactions + hover strip follow the bubble side
+   =========================================================================== */
+.boosts { justify-content: flex-start; }
+.message--me .boosts { justify-content: flex-end; }
+
+.message--me .message__quick-reactions { margin-inline-start: auto; }
+.message:not(.message--me) .message__quick-reactions { margin-inline-end: auto; }
+
+/* ===========================================================================
+   PHASE 5 — Hover timestamps (desktop), faded-static on touch
+   =========================================================================== */
+.message__permalink {
+  position: absolute;
+  inset-block-start: 0.1rem;
+  opacity: 0;
+  transition: opacity 120ms ease-in-out;
+}
+/* received: time sits just right of the bubble; sent: just left */
+.message:not(.message--me) .message__permalink { inset-inline-start: calc(100% + 0.4rem); }
+.message--me .message__permalink { inset-inline-end: calc(100% + 0.4rem); }
+
+@media (hover: hover) and (pointer: fine) {
+  .message:hover .message__permalink { opacity: 0.55; }
+}
+@media (hover: none) and (pointer: coarse) {
+  .message__permalink { position: static; opacity: 0.4; }
+}
