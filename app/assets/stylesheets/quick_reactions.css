@@ -1,0 +1,53 @@
+/* Slack-style quick-reaction strip on message hover.
+   Desktop pointer only — touch keeps the existing options-menu tap flow.
+   Loaded automatically via stylesheet_link_tag :all. */
+
+.message__quick-reactions {
+  display: none;
+}
+
+.message__quick-reactions form {
+  display: inline-flex;
+  margin: 0;
+}
+
+.message__quick-react-btn {
+  --btn-background: transparent;
+  --btn-border-color: transparent;
+  --btn-border-radius: 50%;
+  --btn-padding: 0.2em;
+
+  aspect-ratio: 1;
+  font-size: 0.95rem;
+  line-height: 1;
+
+  .boost-character {
+    margin: 0;
+    pointer-events: none;
+  }
+
+  @media (any-hover: hover) {
+    &:where(:not(:active):hover) {
+      --btn-background: var(--color-border-dark);
+    }
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .message__quick-reactions {
+    align-items: center;
+    background-color: var(--color-bg);
+    border: 1px solid var(--color-border-darker);
+    border-radius: 2em;
+    display: inline-flex;
+    gap: 0.1em;
+    opacity: 0;
+    padding: 0.15em;
+    transition: opacity 150ms ease-in-out;
+    transition-delay: 100ms;
+  }
+
+  .message:hover .message__quick-reactions {
+    opacity: 1;
+  }
+}
